@@ -33,6 +33,7 @@ ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1
 
 # Install python deps INSIDE the env
 RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel && \
+    mamba run -n sam3d-objects python -V && \
     mamba run -n sam3d-objects pip install --no-cache-dir -e ".[dev]" && \
     mamba run -n sam3d-objects pip install --no-cache-dir -e ".[p3d]" && \
     mamba run -n sam3d-objects pip install --no-cache-dir "gsplat==1.5.3" && \
@@ -48,3 +49,4 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
