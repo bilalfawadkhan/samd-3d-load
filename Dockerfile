@@ -60,29 +60,26 @@ ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com https://download.pytorch.or
 # ---------------------------------------------
 # (11)(12)(14) Install extras into the env
 # ---------------------------------------------
-RUN mamba run -n sam3d-objects pip install -e ".[dev]" && \
-    mamba run -n sam3d-objects pip install -e ".[p3d]"
-
-# ---------------------------------------------
-# (13) Kaolin find-links (set as ENV)
-# ---------------------------------------------
-ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
-RUN mamba run -n sam3d-objects pip install --upgrade pip setuptools wheel && \
-    mamba run -n sam3d-objects pip install "gsplat==1.5.3"
-RUN mamba run -n sam3d-objects pip install -e ".[inference]"
+# Note: Installing gsplat via pre-compiled wheel to prevent "Failed to build gsplat"
+RUN pip install --no-cache-dir -e '.[dev]' \
+    && pip install --no-cache-dir -e '.[p3d]' \
+    && pip install --no-cache-dir gsplat \
+    && pip install --no-cache-dir -e '.[inference]' \
+    && ./patching/hydra \
+    && pip install --no-cache-dir "huggingface-hub[cli]<1.0" \
+    && pip install --no-cache-dir runpod pillow numpy
 
 # ---------------------------------------------
 # (15) patching/hydra
 # ---------------------------------------------
-RUN mamba run -n sam3d-objects ./patching/hydra
 
 # ---------------------------------------------
 # (16) huggingface cli (non-interactive auth later)
 # ---------------------------------------------
-RUN mamba run -n sam3d-objects pip install "huggingface-hub[cli]<1.0"
+
 
 # FastAPI runtime deps (your API needs these)
-RUN mamba run -n sam3d-objects pip install fastapi uvicorn pydantic pillow numpy
+
 
 # ---------------------------------------------
 # Copy API
@@ -98,5 +95,6 @@ EXPOSE 8000
 # Start FastAPI
 # ---------------------------------------------
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
 
