@@ -32,12 +32,16 @@ ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com https://download.pytorch.or
 ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
 
 # Install python deps INSIDE the env
-RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel && \
-    mamba run -n sam3d-objects python -V && \
-    mamba run -n sam3d-objects pip install --no-cache-dir -e ".[dev]" && \
+# Upgrade tooling
+RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
+
+# Install nvidia-pyindex without build isolation (prevents the "No module named pip" build failure)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir --no-build-isolation "nvidia-pyindex==1.0.9"
+
+RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[dev]" && \
     mamba run -n sam3d-objects pip install --no-cache-dir -e ".[p3d]" && \
     mamba run -n sam3d-objects pip install --no-cache-dir "gsplat" && \
-    mamba run -n sam3d-objects pip install --no-cache-dir -e ".[inference]" && \
+    mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: "gsplat" && \
     mamba run -n sam3d-objects ./patching/hydra && \
     mamba run -n sam3d-objects pip install --no-cache-dir "huggingface-hub[cli]<1.0" && \
     mamba run -n sam3d-objects pip install --no-cache-dir fastapi uvicorn pillow numpy
@@ -49,5 +53,6 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
 
