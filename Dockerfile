@@ -4,6 +4,14 @@ FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /workspace
 
+# 1. System dependencies - Added cmake, libglm-dev, and libgl1 for gsplat/p3d
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git wget curl ca-certificates build-essential \
+    cmake libglm-dev libgl1-mesa-dev \
+    libglib2.0-0 libsm6 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+
 # ----------------------------
 # System deps (wget, git, etc.)
 # ----------------------------
@@ -89,3 +97,4 @@ EXPOSE 8000
 # Start FastAPI
 # ---------------------------------------------
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
