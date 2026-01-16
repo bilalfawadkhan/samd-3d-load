@@ -38,8 +38,9 @@ RUN mamba env create -f environments/default.yml
 # ----------------------------
 # Pip indices / links (for NGC + cu121 + kaolin)
 # ----------------------------
-ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com https://download.pytorch.org/whl/cu121"
-ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
+RUN mamba run -n sam3d-objects mamba install -y -c pytorch3d -c conda-forge pytorch3d
+RUN mamba run -n sam3d-objects pip install --no-cache-dir kaolin
+
 
 # ----------------------------
 # Install Python deps INSIDE env
@@ -82,4 +83,5 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
