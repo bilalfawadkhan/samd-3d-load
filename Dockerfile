@@ -51,8 +51,14 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir appdirs && \
     mamba run -n sam3d-objects pip install --no-cache-dir --no-build-isolation "nvidia-pyindex==1.0.9"
 
 # Repo extras
+# Repo extras
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[dev]"
-RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[p3d]"
+
+# p3d extras WITHOUT deps to avoid flash-attn build issues
+RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[p3d]" --no-deps
+
+# Install core p3d deps explicitly (wheels)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir pytorch3d kaolin
 
 # gsplat: force wheel-only to avoid CUDA compilation during docker build
 RUN mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: "gsplat"
@@ -76,3 +82,4 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
