@@ -36,7 +36,7 @@ RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wh
     mamba run -n sam3d-objects python -V && \
     mamba run -n sam3d-objects pip install --no-cache-dir -e ".[dev]" && \
     mamba run -n sam3d-objects pip install --no-cache-dir -e ".[p3d]" && \
-    mamba run -n sam3d-objects pip install --no-cache-dir "gsplat==1.5.3" && \
+    mamba run -n sam3d-objects pip install --no-cache-dir "gsplat" && \
     mamba run -n sam3d-objects pip install --no-cache-dir -e ".[inference]" && \
     mamba run -n sam3d-objects ./patching/hydra && \
     mamba run -n sam3d-objects pip install --no-cache-dir "huggingface-hub[cli]<1.0" && \
@@ -49,4 +49,5 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
