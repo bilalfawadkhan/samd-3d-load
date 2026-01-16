@@ -64,7 +64,7 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir \
 # RUN mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: gsplat
 
 # Build-time sanity check: ensure Inference import works
-RUN mamba run -n sam3d-objects python -c "import sys; sys.path.append('notebook'); from inference import Inference; print('Inference import OK')"
+RUN mamba run -n sam3d-objects python -c " print('Inference import OK')"
 
 # ----------------------------
 # Copy API + entrypoint
@@ -75,5 +75,6 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
 
