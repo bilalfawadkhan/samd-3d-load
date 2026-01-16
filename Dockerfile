@@ -4,13 +4,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /workspace
 
 # ----------------------------
-# System dependencies
+# System deps
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git wget curl ca-certificates bash \
     build-essential cmake \
-    libglm-dev libgl1-mesa-dev \
-    libglib2.0-0 libsm6 libxext6 libxrender1 \
+    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
@@ -35,44 +34,37 @@ WORKDIR /workspace/sam-3d-objects
 # ----------------------------
 RUN mamba env create -f environments/default.yml
 
-# ----------------------------
-# Pip indices / links (for NGC + cu121 + kaolin)
-# ----------------------------
-RUN mamba run -n sam3d-objects mamba install -y -c pytorch3d -c conda-forge pytorch3d
-RUN mamba run -n sam3d-objects pip install --no-cache-dir kaolin
-
+# Use CUDA/PyTorch extra indices (keep for torch/torchvision wheels if needed)
+ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
+# Keep Kaolin link for later if you add kaolin
+ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
 
 # ----------------------------
-# Install Python deps INSIDE env
+# Install only what we need (avoid repo pinned dev/p3d deps)
 # ----------------------------
 RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
 
-# Fix nvidia-pyindex build issues (needs appdirs)
-RUN mamba run -n sam3d-objects pip install --no-cache-dir appdirs && \
-    mamba run -n sam3d-objects pip install --no-cache-dir --no-build-isolation "nvidia-pyindex==1.0.9"
+# Install the project itself, but DO NOT pull its pinned dependencies (avoids torchaudio==...+cu121, flash-attn, etc.)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 
-# Repo extras
-# Repo extras
-RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[dev]"
-
-# p3d extras WITHOUT deps to avoid flash-attn build issues
-RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[p3d]" --no-deps
-
-# Install core p3d deps explicitly (wheels)
-RUN mamba run -n sam3d-objects pip install --no-cache-dir pytorch3d kaolin
-
-# gsplat: force wheel-only to avoid CUDA compilation during docker build
-RUN mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: "gsplat"
-
-# Inference extras (this was missing in your last file)
-RUN mamba run -n sam3d-objects pip install --no-cache-dir -e ".[inference]"
-
-# Repo patch step
+# Apply hydra patch inside env
 RUN mamba run -n sam3d-objects ./patching/hydra
 
-# HF CLI + API runtime deps
-RUN mamba run -n sam3d-objects pip install --no-cache-dir "huggingface-hub[cli]<1.0" && \
-    mamba run -n sam3d-objects pip install --no-cache-dir fastapi uvicorn pillow numpy
+# API + core runtime deps
+RUN mamba run -n sam3d-objects pip install --no-cache-dir \
+    fastapi uvicorn pillow numpy pydantic \
+    huggingface-hub[cli]<1.0
+
+# Common inference deps often required by this repo (safe additions)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir \
+    opencv-python-headless imageio tqdm
+
+# Optional: gsplat as wheel-only (won’t compile during build). If no wheel exists for your python, this will fail.
+# Uncomment if your inference requires it:
+# RUN mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: gsplat
+
+# Build-time sanity check: ensure Inference import works
+RUN mamba run -n sam3d-objects python -c "import sys; sys.path.append('notebook'); from inference import Inference; print('Inference import OK')"
 
 # ----------------------------
 # Copy API + entrypoint
@@ -83,5 +75,3 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
-
-
