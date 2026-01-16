@@ -47,8 +47,7 @@ RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wh
 # Install the project itself, but DO NOT pull its pinned dependencies (avoids torchaudio==...+cu121, flash-attn, etc.)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 
-# Apply hydra patch inside env
-RUN mamba run -n sam3d-objects ./patching/hydra
+
 
 # API + core runtime deps
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
@@ -75,3 +74,4 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
