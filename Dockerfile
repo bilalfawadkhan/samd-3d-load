@@ -52,7 +52,8 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 # API + core runtime deps
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
     fastapi uvicorn pillow numpy pydantic \
-    huggingface-hub[cli]<1.0
+    "huggingface-hub[cli]<1.0"
+
 
 # Common inference deps often required by this repo (safe additions)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
@@ -74,4 +75,5 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
