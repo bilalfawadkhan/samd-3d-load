@@ -67,7 +67,8 @@ RUN mamba run -n sam3d-objects pip install -e ".[dev]" && \
 # (13) Kaolin find-links (set as ENV)
 # ---------------------------------------------
 ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
-
+RUN mamba run -n sam3d-objects pip install --upgrade pip setuptools wheel && \
+    mamba run -n sam3d-objects pip install "gsplat==1.5.3"
 RUN mamba run -n sam3d-objects pip install -e ".[inference]"
 
 # ---------------------------------------------
@@ -97,4 +98,5 @@ EXPOSE 8000
 # Start FastAPI
 # ---------------------------------------------
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
