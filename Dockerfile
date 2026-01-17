@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mamba run -n sam3d-objects pip install --no-cache-dir seaborn
+
+
 # ----------------------------
 # Miniforge (mamba)
 # ----------------------------
@@ -86,3 +89,4 @@ COPY handler.py /workspace/sam-3d-objects/handler.py
 # RunPod Serverless entry
 # ----------------------------
 CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
+
