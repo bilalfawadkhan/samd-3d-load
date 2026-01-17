@@ -23,6 +23,9 @@ RUN wget -q "https://github.com/conda-forge/miniforge/releases/latest/download/M
 ENV PATH=/workspace/mamba/bin:$PATH
 SHELL ["/bin/bash", "-lc"]
 
+# Avoid conda auto-activation surprises
+ENV CONDA_AUTO_ACTIVATE_BASE=false
+
 # ----------------------------
 # Clone repo
 # ----------------------------
@@ -34,55 +37,51 @@ WORKDIR /workspace/sam-3d-objects
 # ----------------------------
 RUN mamba env create -f environments/default.yml
 
-# Use CUDA/PyTorch extra indices (keep for torch/torchvision wheels if needed)
+# Torch index (cu121)
 ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
-# Keep Kaolin link for later if you add kaolin
-ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
-# Remove binutils activation hook that crashes under nounset in some runtimes
-RUN rm -f /opt/conda/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh || true && \
-    rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh || true
 
 # ----------------------------
-# Install only what we need (avoid repo pinned dev/p3d deps)
+# Remove problematic activation hook (RunPod/NVIDIA wrappers may enable nounset)
+# ----------------------------
+RUN rm -f /opt/conda/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true && \
+    rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true
+
+# ----------------------------
+# Python tooling
 # ----------------------------
 RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
 
-# Install the project itself, but DO NOT pull its pinned dependencies (avoids torchaudio==...+cu121, flash-attn, etc.)
+# Install torch + torchvision explicitly (CU121)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir \
+    torch==2.5.1+cu121 torchvision==0.20.1+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# Install the repo itself WITHOUT its pinned deps (avoids torchaudio==...+cu121 + flash-attn)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 
+# Apply repo patch
+RUN mamba run -n sam3d-objects ./patching/hydra
 
-
-# API + core runtime deps
+# Runtime deps (serverless + image/mask handling)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    fastapi uvicorn pillow numpy pydantic \
-    "huggingface-hub[cli]<1.0"
+    runpod \
+    numpy pillow opencv-python-headless imageio tqdm
 
+# HF CLI (for downloading checkpoints in handler)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir "huggingface-hub[cli]<1.0"
 
-# Common inference deps often required by this repo (safe additions)
-RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    opencv-python-headless imageio tqdm
-
-# Optional: gsplat as wheel-only (won’t compile during build). If no wheel exists for your python, this will fail.
-# Uncomment if your inference requires it:
-# RUN mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: gsplat
-# Install PyTorch + CUDA 12.1 wheels explicitly (needed for inference)
-RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    torch==2.5.1+cu121 torchvision==0.20.1+cu121 --index-url https://download.pytorch.org/whl/cu121
-
+# Sanity check
 RUN mamba run -n sam3d-objects python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
 
 # ----------------------------
-# Copy API + entrypoint
+# Copy your code
 # ----------------------------
+COPY handler.py /workspace/sam-3d-objects/handler.py
 COPY api.py /workspace/sam-3d-objects/api.py
 COPY start.sh /workspace/sam-3d-objects/start.sh
 RUN chmod +x /workspace/sam-3d-objects/start.sh
 
-EXPOSE 8000
-CMD ["/workspace/sam-3d-objects/start.sh"]
-
-
-
-
-
-
+# ----------------------------
+# RUNPOD SERVERLESS ENTRYPOINT
+# ----------------------------
+CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; export ADDR2LINE=${ADDR2LINE:-addr2line}; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
