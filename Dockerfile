@@ -1,6 +1,9 @@
+# Dockerfile
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /workspace
 
 # ----------------------------
@@ -75,12 +78,9 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir \
 RUN mamba run -n sam3d-objects python -c "import utils3d; import torch; print('utils3d ok | torch', torch.__version__)"
 
 # ----------------------------
-# Copy your code
+# Copy handler into repo root
 # ----------------------------
 COPY handler.py /workspace/sam-3d-objects/handler.py
-COPY api.py /workspace/sam-3d-objects/api.py
-COPY start.sh /workspace/sam-3d-objects/start.sh
-RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 # ----------------------------
 # RunPod Serverless entry
