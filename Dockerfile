@@ -22,8 +22,6 @@ RUN wget -q "https://github.com/conda-forge/miniforge/releases/latest/download/M
 
 ENV PATH=/workspace/mamba/bin:$PATH
 SHELL ["/bin/bash", "-lc"]
-
-# Avoid conda auto-activation surprises
 ENV CONDA_AUTO_ACTIVATE_BASE=false
 
 # ----------------------------
@@ -40,18 +38,15 @@ RUN mamba env create -f environments/default.yml
 # Torch index (cu121)
 ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
 
-# ----------------------------
-# Remove problematic activation hook (RunPod/NVIDIA wrappers may enable nounset)
-# ----------------------------
-RUN rm -f /opt/conda/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true && \
-    rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true
+# (Optional) remove binutils activation hook if your platform sets nounset aggressively
+RUN rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true
 
 # ----------------------------
 # Python tooling
 # ----------------------------
 RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
 
-# IMPORTANT: needed for ./patching/hydra (provides `import hydra`)
+# Needed for ./patching/hydra (provides `import hydra`)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir "hydra-core>=1.3,<1.4"
 
 # Install torch + torchvision explicitly (CU121)
@@ -59,22 +54,25 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir \
     torch==2.5.1+cu121 torchvision==0.20.1+cu121 \
     --index-url https://download.pytorch.org/whl/cu121
 
-# Install the repo itself WITHOUT its pinned deps (avoids torchaudio==...+cu121 + flash-attn)
+# Install the repo itself WITHOUT its pinned deps
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 
 # Apply repo patch (now works because hydra-core is installed)
 RUN mamba run -n sam3d-objects ./patching/hydra
 
+# ---- utils3d (REQUIRED by notebook/inference.py) ----
+# IMPORTANT: Do NOT use "pip install utils3d" from PyPI (wrong package).
+RUN mamba run -n sam3d-objects pip uninstall -y utils3d || true && \
+    mamba run -n sam3d-objects pip install --no-cache-dir \
+      "git+https://github.com/EasternJournalist/utils3d.git@c5daf6f6c244d251f252102d09e9b7bcef791a38"
+
 # Runtime deps (serverless + image/mask handling)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    runpod \
-    numpy pillow opencv-python-headless imageio tqdm
-
-# HF CLI (for downloading checkpoints in handler)
-RUN mamba run -n sam3d-objects pip install --no-cache-dir "huggingface-hub[cli]<1.0"
+    runpod numpy pillow opencv-python-headless imageio tqdm \
+    "huggingface-hub[cli]<1.0"
 
 # Sanity check
-RUN mamba run -n sam3d-objects python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
+RUN mamba run -n sam3d-objects python -c "import utils3d; import torch; print('utils3d ok | torch', torch.__version__)"
 
 # ----------------------------
 # Copy your code
@@ -85,6 +83,6 @@ COPY start.sh /workspace/sam-3d-objects/start.sh
 RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 # ----------------------------
-# RUNPOD SERVERLESS ENTRYPOINT
+# RunPod Serverless entry
 # ----------------------------
-CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; export ADDR2LINE=${ADDR2LINE:-addr2line}; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
+CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
