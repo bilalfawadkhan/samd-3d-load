@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
+set +u
+set +o nounset 2>/dev/null || true
+export ADDR2LINE="${ADDR2LINE:-addr2line}"
+
 cd /workspace/sam-3d-objects
 
 TAG="${SAM3D_TAG:-hf}"
@@ -31,5 +35,4 @@ else
 fi
 
 mamba run -n sam3d-objects python -c "import torch; print(torch.version.cuda, torch.cuda.is_available())"
-
 exec mamba run -n sam3d-objects uvicorn api:app --host 0.0.0.0 --port 8000
