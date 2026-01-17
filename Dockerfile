@@ -51,6 +51,9 @@ RUN rm -f /opt/conda/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_l
 # ----------------------------
 RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
 
+# IMPORTANT: needed for ./patching/hydra (provides `import hydra`)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir "hydra-core>=1.3,<1.4"
+
 # Install torch + torchvision explicitly (CU121)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
     torch==2.5.1+cu121 torchvision==0.20.1+cu121 \
@@ -59,7 +62,7 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir \
 # Install the repo itself WITHOUT its pinned deps (avoids torchaudio==...+cu121 + flash-attn)
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 
-# Apply repo patch
+# Apply repo patch (now works because hydra-core is installed)
 RUN mamba run -n sam3d-objects ./patching/hydra
 
 # Runtime deps (serverless + image/mask handling)
