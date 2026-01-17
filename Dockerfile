@@ -38,6 +38,9 @@ RUN mamba env create -f environments/default.yml
 ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
 # Keep Kaolin link for later if you add kaolin
 ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
+# Remove binutils activation hook that crashes under nounset in some runtimes
+RUN rm -f /opt/conda/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh || true && \
+    rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh || true
 
 # ----------------------------
 # Install only what we need (avoid repo pinned dev/p3d deps)
@@ -77,6 +80,7 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
 
 
