@@ -62,6 +62,11 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir \
 # Optional: gsplat as wheel-only (won’t compile during build). If no wheel exists for your python, this will fail.
 # Uncomment if your inference requires it:
 # RUN mamba run -n sam3d-objects pip install --no-cache-dir --only-binary=:all: gsplat
+# Install PyTorch + CUDA 12.1 wheels explicitly (needed for inference)
+RUN mamba run -n sam3d-objects pip install --no-cache-dir \
+    torch==2.5.1+cu121 torchvision==0.20.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+
+RUN mamba run -n sam3d-objects python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
 
 # ----------------------------
 # Copy API + entrypoint
@@ -72,6 +77,7 @@ RUN chmod +x /workspace/sam-3d-objects/start.sh
 
 EXPOSE 8000
 CMD ["/workspace/sam-3d-objects/start.sh"]
+
 
 
 
