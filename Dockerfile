@@ -35,7 +35,7 @@ ENV CONDA_AUTO_ACTIVATE_BASE=false
 # ----------------------------
 # Clone repo
 # ----------------------------
-RUN git clone https://github.com/facebookresearch/sam-3d-objects.git /workspace/sam-3d-objects
+RUN git clone https://github.com/bilalfawadkhan/sam-3d-objects.git /workspace/sam-3d-objects
 WORKDIR /workspace/sam-3d-objects
 
 # ----------------------------
@@ -87,3 +87,4 @@ RUN apt-get purge -y --auto-remove \
 COPY handler.py /workspace/sam-3d-objects/handler.py
 
 CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
+
