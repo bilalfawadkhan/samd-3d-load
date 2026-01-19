@@ -42,7 +42,8 @@ WORKDIR /workspace/sam-3d-objects
 # Create conda env + install deps
 # ----------------------------
 RUN mamba env create -f environments/default.yml
-
+RUN mamba run -n sam3d-objects pip install --no-cache-dir \
+    loguru seaborn
 RUN mamba run -n sam3d-objects pip install --no-cache-dir seaborn
 
 ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
@@ -87,4 +88,5 @@ RUN apt-get purge -y --auto-remove \
 COPY handler.py /workspace/sam-3d-objects/handler.py
 
 CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
+
 
