@@ -87,6 +87,13 @@ RUN apt-get purge -y --auto-remove \
 # ----------------------------
 COPY handler.py /workspace/sam-3d-objects/handler.py
 
-CMD ["bash", "-lc", "set +u; set +o nounset 2>/dev/null || true; cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
+# ... after: RUN mamba env create -f environments/default.yml
+
+ENV PATH=/workspace/mamba/envs/sam3d-objects/bin:$PATH
+
+# keep your CMD (it’s fine)
+CMD ["bash", "-lc", "cd /workspace/sam-3d-objects && mamba run -n sam3d-objects python -u handler.py"]
+
+
 
 
