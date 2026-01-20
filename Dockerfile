@@ -45,16 +45,24 @@ RUN mamba env create -f environments/default.yml
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
     loguru seaborn
 
-ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com"
+# ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
+RUN mamba run -n sam3d-objects mamba install -y \
+  -c pytorch -c nvidia -c conda-forge \
+  pytorch torchvision pytorch-cuda=12.1
+
+RUN mamba run -n sam3d-objects mamba install -y \
+  -c pytorch3d -c pytorch -c nvidia -c conda-forge \
+  pytorch3d
+
 
 RUN rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true
 
 RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
 RUN mamba run -n sam3d-objects pip install --no-cache-dir "hydra-core>=1.3,<1.4"
 
-RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    torch==2.5.1+cu121 torchvision==0.20.1+cu121 \
-    --index-url https://download.pytorch.org/whl/cu121
+# RUN mamba run -n sam3d-objects pip install --no-cache-dir \
+#     torch==2.5.1+cu121 torchvision==0.20.1+cu121 \
+#     --index-url https://download.pytorch.org/whl/cu121
 
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
 RUN mamba run -n sam3d-objects python ./patching/hydra
@@ -89,6 +97,7 @@ COPY handler.py /workspace/sam-3d-objects/handler.py
 
 # keep your CMD (it’s fine)
 CMD ["/workspace/mamba/envs/sam3d-objects/bin/python", "-u", "/workspace/sam-3d-objects/handler.py"]
+
 
 
 
