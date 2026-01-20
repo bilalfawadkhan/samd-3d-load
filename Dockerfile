@@ -44,9 +44,8 @@ WORKDIR /workspace/sam-3d-objects
 RUN mamba env create -f environments/default.yml
 RUN mamba run -n sam3d-objects pip install --no-cache-dir \
     loguru seaborn
-RUN mamba run -n sam3d-objects pip install --no-cache-dir seaborn
 
-ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
+ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com"
 
 RUN rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true
 
@@ -58,7 +57,7 @@ RUN mamba run -n sam3d-objects pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu121
 
 RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
-RUN mamba run -n sam3d-objects ./patching/hydra
+RUN mamba run -n sam3d-objects bash ./patching/hydra
 
 RUN mamba run -n sam3d-objects pip uninstall -y utils3d || true && \
     mamba run -n sam3d-objects pip install --no-cache-dir \
@@ -88,11 +87,9 @@ RUN apt-get purge -y --auto-remove \
 COPY handler.py /workspace/sam-3d-objects/handler.py
 
 
-
-
-
 # keep your CMD (it’s fine)
 CMD ["/workspace/mamba/envs/sam3d-objects/bin/python", "-u", "/workspace/sam-3d-objects/handler.py"]
+
 
 
 
