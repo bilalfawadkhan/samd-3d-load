@@ -11,8 +11,15 @@ from PIL import Image
 import runpod
 
 # Make SAM-3D notebook code importable
+# Make SAM-3D notebook code importable
 sys.path.append("notebook")
+
+# Ensure CONDA_PREFIX exists even without conda activation
+os.environ.setdefault("CONDA_PREFIX", "/workspace/mamba/envs/sam3d-objects")
+os.environ.setdefault("CUDA_HOME", os.environ["CONDA_PREFIX"])
+
 from inference import Inference  # noqa: E402
+
 
 # ----------------------------
 # Load model ONCE at cold start
