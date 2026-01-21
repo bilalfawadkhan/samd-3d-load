@@ -18,7 +18,7 @@ sys.path.append("notebook")
 os.environ.setdefault("CONDA_PREFIX", "/workspace/mamba/envs/sam3d-objects")
 os.environ.setdefault("CUDA_HOME", os.environ["CONDA_PREFIX"])
 
-from inference import Inference  # noqa: E402
+from notebook.inference import Inference  # noqa: E402
 
 
 # ----------------------------
