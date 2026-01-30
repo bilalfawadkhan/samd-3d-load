@@ -1,107 +1,75 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+# Base Image: NVIDIA CUDA 12.1 compatible
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
+# Set non-interactive installation
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
 
-WORKDIR /workspace
-
-# ----------------------------
-# System deps (split into build + runtime)
-# ----------------------------
-# Runtime libs first (keep)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates \
-    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+# 1. Environment Setup & System Dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    wget \
+    libgl1-mesa-glx \
+    software-properties-common \
+    openssh-server \
+    nginx \
+    ca-certificates \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Build deps (remove later)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git wget curl \
-    build-essential cmake \
-    && rm -rf /var/lib/apt/lists/*
+# Set Python 3.11 as default python
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && python -m ensurepip --upgrade
 
-# ----------------------------
-# Miniforge (mamba)
-# ----------------------------
-RUN wget -q "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" \
-    -O /tmp/Miniforge3-Linux-x86_64.sh && \
-    bash /tmp/Miniforge3-Linux-x86_64.sh -b -p /workspace/mamba && \
-    rm -f /tmp/Miniforge3-Linux-x86_64.sh
+# Upgrade pip
+RUN python -m pip install --upgrade pip
 
-ENV PATH=/workspace/mamba/bin:$PATH
-SHELL ["/bin/bash", "-lc"]
-ENV CONDA_AUTO_ACTIVATE_BASE=false
+# Set working directory for base app
+WORKDIR /app
 
-# ----------------------------
-# Clone repo
-# ----------------------------
-RUN git clone https://github.com/bilalfawadkhan/sam-3d-objects.git /workspace/sam-3d-objects
-WORKDIR /workspace/sam-3d-objects
+# 2. Python Dependencies (Pre-install)
+# Install runpod (for the serverless handler)
+RUN pip install runpod
 
-# ----------------------------
-# Create conda env + install deps
-# ----------------------------
-RUN mamba env create -f environments/default.yml
-RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    loguru seaborn
+# Set environment variables for PyTorch / NVIDIA wheels
+ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com https://download.pytorch.org/whl/cu121"
+ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
 
-# ENV PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121 https://pypi.ngc.nvidia.com"
-RUN mamba run -n sam3d-objects mamba install -y \
-  -c pytorch -c nvidia -c conda-forge \
-  pytorch torchvision pytorch-cuda=12.1
+# 3. Project Install (Clone from GitHub)
+# Clone the repository
+RUN git clone https://github.com/facebookresearch/sam-3d-objects.git sam-3d-objects
 
-RUN mamba run -n sam3d-objects mamba install -y \
-  -c pytorch3d -c pytorch -c nvidia -c conda-forge \
-  pytorch3d
+# Set working directory to the repo
+WORKDIR /app/sam-3d-objects
 
+# Run pip install -e '.[dev]' first
+RUN pip install -e '.[dev]'
 
-RUN rm -f /workspace/mamba/envs/sam3d-objects/etc/conda/activate.d/activate-binutils_linux-64.sh 2>/dev/null || true
+# Run pip install -e '.[p3d]' explicitly to handle the PyTorch3D dependency issue
+RUN pip install -e '.[p3d]'
 
-RUN mamba run -n sam3d-objects python -m pip install --upgrade pip setuptools wheel
-RUN mamba run -n sam3d-objects pip install --no-cache-dir "hydra-core>=1.3,<1.4"
+# Run pip install -e '.[inference]'
+RUN pip install -e '.[inference]'
 
-# RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-#     torch==2.5.1+cu121 torchvision==0.20.1+cu121 \
-#     --index-url https://download.pytorch.org/whl/cu121
+# 4. Patching
+# Execute the patching script located at ./patching/hydra inside the container
+RUN chmod +x ./patching/hydra && ./patching/hydra
 
-RUN mamba run -n sam3d-objects pip install --no-cache-dir -e . --no-deps
-RUN mamba run -n sam3d-objects python ./patching/hydra
+# 5. Runtime / Handler Setup
+# Copy handler and start script from build context to the repo directory
+COPY handler.py .
+COPY start.sh .
 
-RUN mamba run -n sam3d-objects pip uninstall -y utils3d || true && \
-    mamba run -n sam3d-objects pip install --no-cache-dir \
-      "git+https://github.com/EasternJournalist/utils3d.git@c5daf6f6c244d251f252102d09e9b7bcef791a38"
+# Make start script executable
+RUN chmod +x start.sh
 
-RUN mamba run -n sam3d-objects pip install --no-cache-dir \
-    runpod numpy pillow opencv-python-headless imageio tqdm \
-    "huggingface-hub[cli]<1.0"
+# Set Workspace Dir for start.sh
+ENV WORKSPACE_DIR="/app/sam-3d-objects"
 
-RUN mamba run -n sam3d-objects python -c "import utils3d; import torch; print('utils3d ok | torch', torch.__version__)"
-
-# ----------------------------
-# Cleanup to shrink image
-# ----------------------------
-# 1) Remove build tools
-# 2) Clear apt cache
-# 3) Clear conda/mamba package caches
-RUN apt-get purge -y --auto-remove \
-      git wget curl build-essential cmake \
-    && rm -rf /var/lib/apt/lists/* \
-    && mamba clean -a -y \
-    && rm -rf /workspace/mamba/pkgs
-
-# ----------------------------
-# Copy handler
-# ----------------------------
-COPY handler.py /workspace/sam-3d-objects/handler.py
-
-
-# keep your CMD (it’s fine)
-CMD ["/workspace/mamba/envs/sam3d-objects/bin/python", "-u", "/workspace/sam-3d-objects/handler.py"]
-
-
-
-
-
-
-
-
+# Entrypoint
+CMD [ "./start.sh" ]

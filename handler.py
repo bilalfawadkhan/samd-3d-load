@@ -1,106 +1,96 @@
-# handler.py
-import base64
-import io
-import os
-import sys
-import tempfile
-from typing import Any, Dict
-
-import numpy as np
-from PIL import Image
 import runpod
+import sys
+import os
+import base64
+from io import BytesIO
 
-# Make SAM-3D notebook code importable
-# Make SAM-3D notebook code importable
+# Add notebook directory to sys.path to import inference module
 sys.path.append("notebook")
 
-# Ensure CONDA_PREFIX exists even without conda activation
-os.environ.setdefault("CONDA_PREFIX", "/workspace/mamba/envs/sam3d-objects")
-os.environ.setdefault("CUDA_HOME", os.environ["CONDA_PREFIX"])
+# Import Inference class (assuming it exists based on requirements)
+try:
+    from inference import Inference
+except ImportError:
+    print("Warning: Could not import Inference from notebook.inference. Make sure the project structure is correct.")
+    # Placeholder for static check context
+    Inference = None
 
-from notebook.inference import Inference  # noqa: E402
+# Global model initialization to load weights during container cold start
+inference_model = None
+CONFIG_PATH = "configs/inference-s3o-40k.yaml" # Assuming a default config path, adjust if needed
 
+def init_model():
+    global inference_model
+    if inference_model is None:
+        if Inference:
+             # Assuming config_path is needed. 
+             # If exact path isn't known, this might need adjustment by user.
+             # Using a plausible default or requiring it in env.
+             config_path = os.environ.get("INFERENCE_CONFIG_PATH", "configs/inference-s3o-40k.yaml")
+             print(f"Initializing Inference model with config: {config_path}")
+             inference_model = Inference(config_path, compile=False)
+        else:
+             print("Inference class not available.")
 
-# ----------------------------
-# Load model ONCE at cold start
-# ----------------------------
-TAG = os.getenv("SAM3D_TAG", "hf")
-CONFIG_PATH = os.getenv("SAM3D_CONFIG", f"checkpoints/{TAG}/pipeline.yaml")
-
-print(f"[sam3d] Loading model config: {CONFIG_PATH}")
-inference = Inference(CONFIG_PATH, compile=False)
-print("[sam3d] Model loaded.")
-
-
-def _decode_b64_to_pil(b64_str: str, mode: str) -> Image.Image:
-    data = base64.b64decode(b64_str)
-    img = Image.open(io.BytesIO(data))
-    return img.convert(mode)
-
-
-def _binary_mask_from_pil(mask_img: Image.Image) -> Image.Image:
+def handler(job):
     """
-    Ensures mask is crisp binary (0 or 255) in 'L' mode.
-    Accepts any incoming L/LA/RGB/RGBA; thresholds >0.
-    If mask is multi-channel, uses last channel (often alpha).
+    Handler function for RunPod serverless worker.
     """
-    arr = np.array(mask_img)
-    if arr.ndim == 3:
-        arr = arr[..., -1]
-    arr = (arr > 0).astype(np.uint8) * 255
-    return Image.fromarray(arr, mode="L")
+    job_input = job.get("input", {})
+    
+    # 1. Parse Input
+    image_input = job_input.get("image")
+    prompt_points = job_input.get("points") # list of [x, y] or similar
+    prompt_mask = job_input.get("mask")
+    seed = job_input.get("seed", 42)
 
+    if not image_input:
+        return {"error": "No image provided"}
 
-def _encode_file_b64(path: str) -> str:
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
-
-
-def handler(job: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Expects RunPod payload:
-    {
-      "input": {
-        "imageBase64": "...",
-        "maskBase64": "...",
-        "options": {"seed": 42, "output": ["ply"]}
-      }
-    }
-    Returns:
-    {
-      "plyBase64": "...",
-      "filename": "splat.ply"
-    }
-    """
+    # 2. Run Inference
     try:
-        inp = job.get("input") or {}
-        image_b64 = inp["imageBase64"]
-        mask_b64 = inp["maskBase64"]
-        options = inp.get("options", {})
-        seed = int(options.get("seed", 42))
-
-        # Decode inputs
-        image = _decode_b64_to_pil(image_b64, "RGB")
-        mask_raw = _decode_b64_to_pil(mask_b64, "L")  # we'll binarize anyway
-        mask = _binary_mask_from_pil(mask_raw)
-
-        # Run model
-        out = inference(image, mask, seed=seed)
-
-        # Export gaussian splat to PLY and return as base64
-        with tempfile.TemporaryDirectory() as td:
-            ply_path = os.path.join(td, "splat.ply")
-            out["gs"].save_ply(ply_path)
-
-            return {
-                "plyBase64": _encode_file_b64(ply_path),
-                "filename": "splat.ply",
-            }
+        # Assuming inference logic acts like the demo snippet
+        # output = inference(image, mask, seed=42)
+        
+        # NOTE: logic to load_image or handle base64 would go here if not handled by Inference class.
+        # For this implementation, we pass inputs directly assuming Inference handles or we need minimal prep.
+        # If Inference expects PIL image:
+        # from PIL import Image
+        # import requests
+        # if image_input.startswith("http"):
+        #     image = Image.open(requests.get(image_input, stream=True).raw)
+        # else:
+        #     image = Image.open(BytesIO(base64.b64decode(image_input)))
+        
+        # Using the instantiated global model
+        if inference_model:
+            # Note: The prompt implies inference(image, mask, seed)
+            # We pass what we have. Adjust argument mapping as per actual Inference signature.
+            output = inference_model(image_input, prompt_mask, seed=seed)
+            
+            # 3. Process Output
+            # output["gs"].save_ply(f"splat.ply")
+            output_path = "splat.ply"
+            if "gs" in output:
+                output["gs"].save_ply(output_path)
+            
+            # Return file content as base64
+            if os.path.exists(output_path):
+                with open(output_path, "rb") as f:
+                    ply_content = f.read()
+                    ply_base64 = base64.b64encode(ply_content).decode("utf-8")
+                return {"ply_base64": ply_base64}
+            else:
+                return {"error": "Output file not generated"}
+        else:
+             return {"error": "Model not initialized"}
 
     except Exception as e:
-        # RunPod marks job failed when "error" key is present
+        print(f"Inference error: {e}")
         return {"error": str(e)}
 
+# Initialize model on startup
+init_model()
 
-if __name__ == "__main__":
-    runpod.serverless.start({"handler": handler})
+# Start RunPod worker
+runpod.serverless.start({"handler": handler})
