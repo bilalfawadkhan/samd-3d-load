@@ -51,7 +51,7 @@ WORKDIR /app/sam-3d-objects
 RUN sed -i '/nvidia-pyindex/d' requirements.txt
 
 # Run pip install -e '.[dev]' first (add --ignore-installed to bypass system blinker issue)
-RUN pip install -e '.[dev]' --ignore-installed blinker
+# RUN pip install -e '.[dev]' --ignore-installed blinker
 
 # Run pip install -e '.[p3d]' explicitly to handle the PyTorch3D dependency issue
 RUN pip install -e '.[p3d]'
