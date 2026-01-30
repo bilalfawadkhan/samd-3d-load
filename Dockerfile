@@ -50,8 +50,8 @@ WORKDIR /app/sam-3d-objects
 # Remove nvidia-pyindex as it is redundant (we use ENV vars) and fails to build
 RUN sed -i '/nvidia-pyindex/d' requirements.txt
 
-# Run pip install -e '.[dev]' first
-RUN pip install -e '.[dev]'
+# Run pip install -e '.[dev]' first (add --ignore-installed to bypass system blinker issue)
+RUN pip install -e '.[dev]' --ignore-installed blinker
 
 # Run pip install -e '.[p3d]' explicitly to handle the PyTorch3D dependency issue
 RUN pip install -e '.[p3d]'
