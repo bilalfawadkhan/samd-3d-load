@@ -47,6 +47,9 @@ RUN git clone https://github.com/facebookresearch/sam-3d-objects.git sam-3d-obje
 # Set working directory to the repo
 WORKDIR /app/sam-3d-objects
 
+# Install PyTorch independently before compiling extensions
+RUN pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
 # Remove nvidia-pyindex as it is redundant (we use ENV vars) and fails to build
 RUN sed -i '/nvidia-pyindex/d' requirements.txt
 
