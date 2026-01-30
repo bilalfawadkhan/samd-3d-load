@@ -47,6 +47,9 @@ RUN git clone https://github.com/facebookresearch/sam-3d-objects.git sam-3d-obje
 # Set working directory to the repo
 WORKDIR /app/sam-3d-objects
 
+# Remove nvidia-pyindex as it is redundant (we use ENV vars) and fails to build
+RUN sed -i '/nvidia-pyindex/d' requirements.txt
+
 # Run pip install -e '.[dev]' first
 RUN pip install -e '.[dev]'
 
