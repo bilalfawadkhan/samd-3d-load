@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     software-properties-common \
+    openssh-server \
+    nginx \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Install Miniforge (Mamba)
@@ -43,6 +46,12 @@ ENV CONDA_DEFAULT_ENV=sam3d-objects
 # Set environment variables for PyTorch / NVIDIA wheels
 ENV PIP_EXTRA_INDEX_URL="https://pypi.ngc.nvidia.com https://download.pytorch.org/whl/cu121"
 ENV PIP_FIND_LINKS="https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.5.1_cu121.html"
+
+# Set CUDA_HOME and Arch List for building extensions (like gsplat, diff-gaussian-rasterization)
+ENV CUDA_HOME="/usr/local/cuda"
+ENV TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0+PTX"
+# Ensure TORCH_CUDA_ARCH_LIST is respected
+ENV IBR_NET_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 
 # Install dev dependencies
 RUN pip install -e '.[dev]'
